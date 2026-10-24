@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AudioVault PWA - Gestor de Colección de Música</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                            accent: '#10b981'
+                        },
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- html5-qrcode for barcode & QR mobile scanning -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
+
+    <!-- Dynamic PWA Manifest & Meta Tags Injection -->
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AudioVault">
+
+    <script>
+        // Generate and inject PWA Web App Manifest inline via Data URI
+        const manifestData = {
+            "name": "AudioVault - Colección de Música",
+            "short_name": "AudioVault",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#0b0f19",
+            "theme_color": "#0f172a",
+            "orientation": "portrait-primary",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%236366f1'><rect width='512' height='512' rx='100' fill='%230f172a'/><path d='M256 160c-53 0-96 43-96 96s43 96 96 96 96-43 96-96-43-96-96-96zm0 144c-26.5 0-48-21.5-48-48s21.5-48 48-48 48 21.5 48 48-21.5 48-48 48z' fill='%2310b981'/><circle cx='256' cy='256' r='20' fill='%23ffffff'/></svg>",
+                    "sizes": "192x192 512x512",
+                    "type": "image/svg+xml",
+                    "purpose": "any maskable"
+                }
+            ]
+        };
+        const manifestString = JSON.stringify(manifestData);
+        const manifestBlob = new Blob([manifestString], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        const manifestLink = document.createElement('link');
+        manifestLink.rel = 'manifest';
+        manifestLink.href = manifestUrl;
+        document.head.appendChild(manifestLink);
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 3D Flip Card Effect */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .transform-style-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#0b0f19] text-slate-100 pb-16 md:pb-0">
+
+    <!-- PWA INSTALL BANNER FOR ANDROID -->
+    <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-indigo-700 to-emerald-600 text-white px-4 py-2.5 flex items-center justify-between text-xs sm:text-sm font-medium shadow-lg sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-mobile-screen-button text-lg"></i>
+            <span>Instalar <strong>AudioVault</strong> en tu pantalla de inicio</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="app.installPWA()" class="bg-white text-indigo-900 px-3 py-1 rounded-lg text-xs font-bold hover:bg-slate-100 transition shadow">
+                Instalar
+            </button>
+            <button onclick="document.getElementById('pwaInstallBanner').classList.add('hidden')" class="text-white/80 hover:text-white p-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- TOP NAV -->
+    <header class="sticky top-0 z-30 bg-[#0f172a]/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-record-vinyl text-lg text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-white leading-tight">AudioVault</h1>
+                <p class="text-[10px] text-slate-400">Colección de Música</p>
+            </div>
+        </div>
+
+        <!-- Search Input -->
+        <div class="flex-1 max-w-sm mx-1">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="searchInput" oninput="app.handleSearch(this.value)" placeholder="Buscar artista, álbum, tema..." class="w-full bg-slate-800/90 border border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-1.5">
+            <button onclick="app.openScannerModal()" title="Escanear Código de Barras" class="px-3 py-1.5 bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                <i class="fa-solid fa-barcode text-sm"></i>
+                <span class="hidden sm:inline">Escanear</span>
+            </button>
+            <button onclick="app.openWebImportModal()" title="Importar desde Web" class="px-3 py-1.5 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                <i class="fa-solid fa-cloud-arrow-down text-sm"></i>
+                <span class="hidden sm:inline">Importar</span>
+            </button>
+            <button onclick="app.openAddModal()" title="Añadir Disco Manualmente" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-medium transition flex items-center gap-1 shadow">
+                <i class="fa-solid fa-plus"></i>
+                <span class="hidden sm:inline">Nuevo</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <div class="flex-1 flex flex-col md:flex-row">
+
+        <!-- SIDEBAR / FILTERS -->
+        <aside class="w-full md:w-60 bg-[#0f172a]/60 border-r border-slate-800 p-3.5 shrink-0 flex flex-col gap-4">
+            
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-2 gap-2 text-center">
+                <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/50">
+                    <span id="statTotalAlbums" class="block text-xl font-bold text-indigo-400">0</span>
+                    <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Álbumes</span>
+                </div>
+                <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/50">
+                    <span id="statTotalTracks" class="block text-xl font-bold text-emerald-400">0</span>
+                    <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Canciones</span>
+                </div>
+            </div>
+
+            <!-- Formats Filter -->
+            <div>
+                <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">Formato</h3>
+                <div class="space-y-1" id="formatFilters"></div>
+            </div>
+
+            <!-- Genres Filter -->
+            <div>
+                <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">Género Musical</h3>
+                <div class="space-y-1 max-h-36 overflow-y-auto pr-1" id="genreFilters"></div>
+            </div>
+
+            <!-- Sort By -->
+            <div>
+                <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-1">Ordenar</h3>
+                <select id="sortSelect" onchange="app.handleSort(this.value)" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    <option value="added-desc">Más recientes</option>
+                    <option value="year-desc">Año (Descendente)</option>
+                    <option value="year-asc">Año (Ascendente)</option>
+                    <option value="artist-asc">Artista (A-Z)</option>
+                    <option value="title-asc">Álbum (A-Z)</option>
+                </select>
+            </div>
+
+            <!-- Backup & Restore -->
+            <div class="mt-auto pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                <button onclick="app.exportCollection()" class="hover:text-indigo-300 transition flex items-center gap-1">
+                    <i class="fa-solid fa-download"></i> Respaldar JSON
+                </button>
+                <label class="hover:text-indigo-300 transition cursor-pointer flex items-center gap-1">
+                    <i class="fa-solid fa-upload"></i> Restaurar
+                    <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="app.importCollection(event)">
+                </label>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 p-3 sm:p-5 overflow-x-hidden">
+
+            <!-- Active View Filters Header -->
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div class="flex items-center gap-2">
+                    <h2 id="viewTitle" class="text-lg font-bold text-white">Mi Colección</h2>
+                    <span id="albumCountBadge" class="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] px-2 py-0.5 rounded-full font-medium">0 discos</span>
+                </div>
+
+                <!-- Tabs View -->
+                <div class="bg-slate-800/80 p-0.5 rounded-xl border border-slate-700/80 flex items-center space-x-1">
+                    <button id="tabGrid" onclick="app.setViewMode('grid')" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white transition">
+                        <i class="fa-solid fa-grip"></i> Discos
+                    </button>
+                    <button id="tabArtists" onclick="app.setViewMode('artists')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">
+                        <i class="fa-solid fa-user-group"></i> Artistas
+                    </button>
+                    <button id="tabTracks" onclick="app.setViewMode('tracks')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">
+                        <i class="fa-solid fa-music"></i> Temas
+                    </button>
+                </div>
+            </div>
+
+            <!-- DYNAMIC CONTENT RENDER -->
+            <div id="contentContainer"></div>
+
+        </main>
+    </div>
+
+    <!-- DETAIL / TRACKLIST MODAL WITH 3D FLIP -->
+    <div id="detailModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 overflow-y-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl relative flex flex-col md:flex-row my-auto">
+            <button onclick="app.closeModal('detailModal')" class="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+
+            <!-- Modal Left: Interactive 3D Cover Flip -->
+            <div class="w-full md:w-5/12 p-5 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800 bg-slate-950/40">
+                
+                <div class="relative w-56 h-56 sm:w-64 sm:h-64 perspective-1000 group cursor-pointer" onclick="app.toggleFlipModalCard()">
+                    <div id="modalCardInner" class="w-full h-full relative transform-style-3d transition-transform duration-700 shadow-xl rounded-xl">
+                        <!-- Front Cover -->
+                        <div class="absolute inset-0 w-full h-full rounded-xl overflow-hidden backface-hidden bg-slate-800 border border-slate-700">
+                            <img id="modalFrontImg" src="" alt="Portada Frontal" class="w-full h-full object-cover">
+                            <span class="absolute bottom-2 right-2 bg-black/75 text-white text-[9px] px-2 py-0.5 rounded backdrop-blur">
+                                <i class="fa-solid fa-rotate"></i> Toca para ver dorso
+                            </span>
+                        </div>
+                        <!-- Back Cover -->
+                        <div class="absolute inset-0 w-full h-full rounded-xl overflow-hidden backface-hidden rotate-y-180 bg-slate-800 border border-slate-700">
+                            <img id="modalBackImg" src="" alt="Contraportada" class="w-full h-full object-cover">
+                            <span class="absolute bottom-2 right-2 bg-black/75 text-white text-[9px] px-2 py-0.5 rounded backdrop-blur">
+                                <i class="fa-solid fa-rotate"></i> Toca para ver frente
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-center space-y-1.5">
+                    <div class="flex items-center justify-center gap-1.5">
+                        <span id="modalFormatBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">CD</span>
+                        <span id="modalGenreBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Rock</span>
+                    </div>
+                    <p id="modalBarcode" class="text-[10px] text-slate-400 font-mono"></p>
+                </div>
+
+                <div class="mt-4 flex items-center gap-2 w-full">
+                    <button id="btnEditAlbum" class="flex-1 py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium transition border border-slate-700 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-pen"></i> Editar
+                    </button>
+                    <button id="btnDeleteAlbum" class="py-1.5 px-3 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-xl text-xs font-medium transition border border-rose-500/30 flex items-center justify-center">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Right: Metadata & Tracklist -->
+            <div class="w-full md:w-7/12 p-5 flex flex-col">
+                <div class="mb-3">
+                    <span id="modalYear" class="text-xs font-semibold text-indigo-400">1973</span>
+                    <h2 id="modalTitle" class="text-xl font-bold text-white leading-tight">Título del Disco</h2>
+                    <p id="modalArtist" class="text-sm text-slate-300 font-medium">Artista / Banda</p>
+                </div>
+
+                <h3 class="text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
+                    <span>Lista de Canciones</span>
+                    <span id="modalTrackCount" class="text-[11px] font-normal text-slate-400">0 temas</span>
+                </h3>
+
+                <!-- Tracklist Scroll Area -->
+                <div class="flex-1 overflow-y-auto max-h-60 border border-slate-800 rounded-xl bg-slate-950/30 divide-y divide-slate-800/60" id="modalTracklist"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD / EDIT MANUAL ALBUM MODAL -->
+    <div id="addModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 overflow-y-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl shadow-2xl p-5 relative my-auto">
+            <button onclick="app.closeModal('addModal')" class="absolute top-3 right-3 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <h2 id="addModalTitle" class="text-lg font-bold text-white mb-3">Añadir Disco</h2>
+
+            <form id="albumForm" onsubmit="app.handleSaveAlbum(event)" class="space-y-3">
+                <input type="hidden" id="formAlbumId">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-1">Título del Disco *</label>
+                        <input type="text" id="formTitle" required placeholder="Ej: Artaud" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-1">Artista / Autor *</label>
+                        <input type="text" id="formArtist" required placeholder="Ej: Spinetta" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-1">Año</label>
+                        <input type="number" id="formYear" placeholder="Ej: 1973" min="1900" max="2030" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-1">Género</label>
+                        <input type="text" id="formGenre" placeholder="Rock, Tango..." list="genreSuggestions" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                        <datalist id="genreSuggestions">
+                            <option value="Rock Nacional"></option>
+                            <option value="Folklore"></option>
+                            <option value="Tango"></option>
+                            <option value="Rock"></option>
+                            <option value="Pop"></option>
+                            <option value="Jazz"></option>
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-1">Formato</label>
+                        <select id="formFormat" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                            <option value="Vinilo">Vinilo</option>
+                            <option value="CD">CD</option>
+                            <option value="MP3">MP3 / Digital</option>
+                            <option value="Cassette">Cassette</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-1">URL Cover Frontal</label>
+                        <input type="url" id="formFrontCover" placeholder="https://..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-300 mb-1">URL Cover Trasera</label>
+                        <input type="url" id="formBackCover" placeholder="https://..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-300 mb-1">Código de Barras / EAN</label>
+                    <input type="text" id="formBarcode" placeholder="Ej: 724384260920" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-300 mb-1">Temas / Canciones (una por línea)</label>
+                    <textarea id="formTracklist" rows="3" placeholder="1. Todas las hojas son del viento (2:12)&#10;2. Bajan (3:26)" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none font-mono"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="app.closeModal('addModal')" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium">Cancelar</button>
+                    <button type="submit" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-medium shadow">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- WEB IMPORT MODAL (MusicBrainz integration) -->
+    <div id="webImportModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 overflow-y-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl p-5 relative my-auto">
+            <button onclick="app.closeModal('webImportModal')" class="absolute top-3 right-3 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <h2 class="text-lg font-bold text-white mb-1">Buscar e Importar desde la Web</h2>
+            <p class="text-xs text-slate-400 mb-3">Busca en la base abierta de MusicBrainz para autorellenar temas y portadas.</p>
+
+            <div class="flex gap-2 mb-3">
+                <input type="text" id="webSearchQuery" placeholder="Artista, álbum o código de barras..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none" onkeyup="if(event.key === 'Enter') app.searchWebAlbums()">
+                <button onclick="app.searchWebAlbums()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-magnifying-glass"></i> Buscar
+                </button>
+            </div>
+
+            <div id="webSearchLoading" class="hidden py-6 text-center text-indigo-400">
+                <i class="fa-solid fa-compact-disc fa-spin text-2xl mb-2"></i>
+                <p class="text-xs">Consultando base de datos musical...</p>
+            </div>
+
+            <div id="webSearchResults" class="max-h-72 overflow-y-auto space-y-2 pr-1">
+                <div class="text-center text-slate-500 py-6 text-xs">Escribe algo arriba para buscar.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE CAMERA QR / BARCODE SCANNER MODAL -->
+    <div id="scannerModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-3">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-5 relative">
+            <button onclick="app.closeScannerModal()" class="absolute top-3 right-3 text-slate-400 hover:text-white z-10">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <h2 class="text-base font-bold text-white mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-barcode text-emerald-400"></i> Escanear Código
+            </h2>
+            <p class="text-[11px] text-slate-400 mb-3">Usa la cámara de tu celular para escanear el código de barras de tu Vinilo o CD.</p>
+
+            <div class="relative bg-black rounded-xl overflow-hidden border border-slate-700 aspect-square flex items-center justify-center mb-3">
+                <div id="qr-reader" class="w-full"></div>
+            </div>
+
+            <!-- Test presets for desktop or quick tests -->
+            <div class="border-t border-slate-800 pt-2">
+                <p class="text-[10px] font-semibold text-slate-400 mb-1.5">Prueba rápida de códigos:</p>
+                <div class="flex flex-wrap gap-1.5">
+                    <button onclick="app.simulateScan('724384260920')" class="px-2 py-1 bg-slate-800 text-[10px] font-mono text-indigo-300 rounded border border-slate-700">724384260920</button>
+                    <button onclick="app.simulateScan('743211568224')" class="px-2 py-1 bg-slate-800 text-[10px] font-mono text-emerald-300 rounded border border-slate-700">743211568224</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-4 right-4 left-4 sm:left-auto z-50 bg-slate-800 border border-indigo-500/50 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 transition-all duration-300 transform translate-y-16 opacity-0 pointer-events-none">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage" class="text-xs font-medium">Operación exitosa</span>
+    </div>
+
+    <!-- REGISTER INLINE PWA SERVICE WORKER -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                const CACHE_NAME = 'audiovault-v1';
+                self.addEventListener('install', (e) => {
+                    e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
+                });
+                self.addEventListener('fetch', (e) => {
+                    e.respondWith(caches.match(e.request).then(response => response || fetch(e.request)));
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'text/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW error:', err));
+        }
+    </script>
+
+    <!-- MAIN APP SCRIPT -->
+    <script>
+        const INITIAL_COLLECTION = [
+            {
+                id: "album-1",
+                title: "Artaud",
+                artist: "Luis Alberto Spinetta / Pescado Rabioso",
+                year: 1973,
+                genre: "Rock Nacional",
+                format: "Vinilo",
+                barcode: "743211568224",
+                frontCover: "https://images.unsplash.com/photo-1539375665275-f9de415ef9ac?w=600&auto=format&fit=crop&q=80",
+                backCover: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600&auto=format&fit=crop&q=80",
+                tracks: [
+                    { title: "Todas las hojas son del viento", duration: "2:12" },
+                    { title: "Superchería", duration: "4:21" },
+                    { title: "La cantata de puentes amarillos", duration: "9:12" },
+                    { title: "Bajan", duration: "3:26" },
+                    { title: "Las habladurías del mundo", duration: "4:03" }
+                ],
+                dateAdded: "2023-10-01"
+            },
+            {
+                id: "album-2",
+                title: "The Dark Side of the Moon",
+                artist: "Pink Floyd",
+                year: 1973,
+                genre: "Rock",
+                format: "CD",
+                barcode: "724384260920",
+                frontCover: "https://images.unsplash.com/photo-1619983081563-430f63602796?w=600&auto=format&fit=crop&q=80",
+                backCover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
+                tracks: [
+                    { title: "Speak to Me / Breathe", duration: "3:57" },
+                    { title: "Time", duration: "6:53" },
+                    { title: "Money", duration: "6:22" },
+                    { title: "Us and Them", duration: "7:49" }
+                ],
+                dateAdded: "2023-10-02"
+            }
+        ];
+
+        class MusicApp {
+            constructor() {
+                this.collection = [];
+                this.currentFilter = { format: 'all', genre: 'all', search: '', sort: 'added-desc' };
+                this.viewMode = 'grid';
+                this.deferredPrompt = null;
+                this.html5QrcodeScanner = null;
+
+                this.init();
+            }
+
+            init() {
+                const stored = localStorage.getItem('audiovault_collection_pwa');
+                if (stored) {
+                    try { this.collection = JSON.parse(stored); } catch(e) { this.collection = INITIAL_COLLECTION; }
+                } else {
+                    this.collection = INITIAL_COLLECTION;
+                    this.saveToStorage();
+                }
+
+                this.setupPWAInstall();
+                this.renderSidebarFilters();
+                this.renderCollection();
+                this.updateStats();
+            }
+
+            setupPWAInstall() {
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    this.deferredPrompt = e;
+                    document.getElementById('pwaInstallBanner').classList.remove('hidden');
+                });
+            }
+
+            installPWA() {
+                if (this.deferredPrompt) {
+                    this.deferredPrompt.prompt();
+                    this.deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            document.getElementById('pwaInstallBanner').classList.add('hidden');
+                        }
+                        this.deferredPrompt = null;
+                    });
+                }
+            }
+
+            saveToStorage() {
+                localStorage.setItem('audiovault_collection_pwa', JSON.stringify(this.collection));
+                this.updateStats();
+            }
+
+            updateStats() {
+                document.getElementById('statTotalAlbums').textContent = this.collection.length;
+                document.getElementById('statTotalTracks').textContent = this.collection.reduce((acc, alb) => acc + (alb.tracks ? alb.tracks.length : 0), 0);
+            }
+
+            renderSidebarFilters() {
+                const formats = ['all', 'Vinilo', 'CD', 'MP3', 'Cassette'];
+                document.getElementById('formatFilters').innerHTML = formats.map(fmt => `
+                    <button onclick="app.setFormatFilter('${fmt}')" class="w-full text-left px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center justify-between ${this.currentFilter.format === fmt ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30' : 'text-slate-400 hover:text-slate-200'}">
+                        <span>${fmt === 'all' ? 'Todos' : fmt}</span>
+                        <span class="text-[10px] opacity-70 bg-slate-800 px-1.5 py-0.5 rounded">${fmt === 'all' ? this.collection.length : this.collection.filter(a => a.format === fmt).length}</span>
+                    </button>
+                `).join('');
+
+                const genresSet = new Set(this.collection.map(a => a.genre).filter(Boolean));
+                const genres = ['all', ...Array.from(genresSet)];
+                document.getElementById('genreFilters').innerHTML = genres.map(gnr => `
+                    <button onclick="app.setGenreFilter('${gnr}')" class="w-full text-left px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center justify-between ${this.currentFilter.genre === gnr ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30' : 'text-slate-400 hover:text-slate-200'}">
+                        <span>${gnr === 'all' ? 'Todos' : gnr}</span>
+                        <span class="text-[10px] opacity-70 bg-slate-800 px-1.5 py-0.5 rounded">${gnr === 'all' ? this.collection.length : this.collection.filter(a => a.genre === gnr).length}</span>
+                    </button>
+                `).join('');
+            }
+
+            setFormatFilter(fmt) { this.currentFilter.format = fmt; this.renderSidebarFilters(); this.renderCollection(); }
+            setGenreFilter(gnr) { this.currentFilter.genre = gnr; this.renderSidebarFilters(); this.renderCollection(); }
+            handleSearch(q) { this.currentFilter.search = q.toLowerCase().trim(); this.renderCollection(); }
+            handleSort(sortVal) { this.currentFilter.sort = sortVal; this.renderCollection(); }
+
+            setViewMode(mode) {
+                this.viewMode = mode;
+                ['grid', 'artists', 'tracks'].forEach(m => {
+                    const btn = document.getElementById('tab' + m.charAt(0).toUpperCase() + m.slice(1));
+                    if (btn) btn.className = m === mode ? "px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white transition" : "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition";
+                });
+                this.renderCollection();
+            }
+
+            getFilteredData() {
+                return this.collection.filter(album => {
+                    if (this.currentFilter.format !== 'all' && album.format !== this.currentFilter.format) return false;
+                    if (this.currentFilter.genre !== 'all' && album.genre !== this.currentFilter.genre) return false;
+                    if (this.currentFilter.search) {
+                        const q = this.currentFilter.search;
+                        const matchTitle = album.title.toLowerCase().includes(q);
+                        const matchArtist = album.artist.toLowerCase().includes(q);
+                        const matchTracks = album.tracks && album.tracks.some(t => t.title.toLowerCase().includes(q));
+                        if (!matchTitle && !matchArtist && !matchTracks) return false;
+                    }
+                    return true;
+                }).sort((a, b) => {
+                    const s = this.currentFilter.sort;
+                    if (s === 'year-desc') return (b.year || 0) - (a.year || 0);
+                    if (s === 'year-asc') return (a.year || 0) - (b.year || 0);
+                    if (s === 'artist-asc') return a.artist.localeCompare(b.artist);
+                    if (s === 'title-asc') return a.title.localeCompare(b.title);
+                    return new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0);
+                });
+            }
+
+            renderCollection() {
+                const data = this.getFilteredData();
+                const container = document.getElementById('contentContainer');
+                document.getElementById('albumCountBadge').textContent = `${data.length} disco${data.length !== 1 ? 's' : ''}`;
+
+                if (data.length === 0) {
+                    container.innerHTML = `<div class="text-center py-12 text-slate-500 text-xs">Sin resultados en la colección.</div>`;
+                    return;
+                }
+
+                if (this.viewMode === 'grid') {
+                    container.innerHTML = `
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                            ${data.map(album => `
+                                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow flex flex-col group">
+                                    <div class="relative aspect-square bg-slate-950 cursor-pointer" onclick="app.openDetailModal('${album.id}')">
+                                        <img src="${album.frontCover || 'https://placehold.co/400'}" class="w-full h-full object-cover">
+                                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur border border-white/10 text-white text-[9px] px-1.5 py-0.5 rounded font-semibold">${album.format}</span>
+                                    </div>
+                                    <div class="p-2.5 flex-1 flex flex-col justify-between">
+                                        <div>
+                                            <p class="text-[10px] text-indigo-400 font-medium">${album.genre || ''} • ${album.year || ''}</p>
+                                            <h3 class="font-bold text-xs text-white truncate leading-tight cursor-pointer" onclick="app.openDetailModal('${album.id}')">${album.title}</h3>
+                                            <p class="text-[11px] text-slate-400 truncate">${album.artist}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else if (this.viewMode === 'artists') {
+                    const groups = {};
+                    data.forEach(a => { if(!groups[a.artist]) groups[a.artist] = []; groups[a.artist].push(a); });
+                    container.innerHTML = Object.keys(groups).map(art => `
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 mb-3">
+                            <h3 class="text-sm font-bold text-white mb-2 pb-1 border-b border-slate-800">${art} (${groups[art].length})</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                ${groups[art].map(alb => `
+                                    <div onclick="app.openDetailModal('${alb.id}')" class="bg-slate-800/50 p-2 rounded-lg flex items-center gap-2 cursor-pointer">
+                                        <img src="${alb.frontCover || 'https://placehold.co/100'}" class="w-10 h-10 rounded object-cover">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-xs font-semibold text-white truncate">${alb.title}</p>
+                                            <p class="text-[10px] text-slate-400">${alb.year || ''} • ${alb.format}</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `).join('');
+                } else if (this.viewMode === 'tracks') {
+                    let tracks = [];
+                    data.forEach(a => (a.tracks || []).forEach(t => tracks.push({ ...t, album: a.title, artist: a.artist, cover: a.frontCover })));
+                    container.innerHTML = `
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/60">
+                            ${tracks.map(t => `
+                                <div class="p-2.5 flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <img src="${t.cover || 'https://placehold.co/50'}" class="w-7 h-7 rounded object-cover">
+                                        <div class="min-w-0">
+                                            <p class="font-semibold text-white truncate">${t.title}</p>
+                                            <p class="text-[10px] text-slate-400 truncate">${t.artist} - ${t.album}</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-[10px] font-mono text-slate-400">${t.duration || ''}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            }
+
+            openDetailModal(id) {
+                const album = this.collection.find(a => a.id === id);
+                if (!album) return;
+
+                document.getElementById('modalTitle').textContent = album.title;
+                document.getElementById('modalArtist').textContent = album.artist;
+                document.getElementById('modalYear').textContent = album.year || 'Año N/A';
+                document.getElementById('modalFormatBadge').textContent = album.format || 'CD';
+                document.getElementById('modalGenreBadge').textContent = album.genre || 'Música';
+                document.getElementById('modalBarcode').textContent = album.barcode ? `EAN/QR: ${album.barcode}` : '';
+
+                const front = album.frontCover || 'https://placehold.co/400';
+                const back = album.backCover || front;
+
+                document.getElementById('modalFrontImg').src = front;
+                document.getElementById('modalBackImg').src = back;
+                document.getElementById('modalCardInner').classList.remove('rotate-y-180');
+
+                const tracklistContainer = document.getElementById('modalTracklist');
+                const tracks = album.tracks || [];
+                document.getElementById('modalTrackCount').textContent = `${tracks.length} temas`;
+
+                tracklistContainer.innerHTML = tracks.map((t, idx) => `
+                    <div class="p-2.5 flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="text-slate-500 text-[10px] w-4">${idx + 1}</span>
+                            <span class="font-medium text-slate-200 truncate">${t.title}</span>
+                        </div>
+                        <span class="text-slate-400 font-mono text-[10px]">${t.duration || ''}</span>
+                    </div>
+                `).join('');
+
+                document.getElementById('btnEditAlbum').onclick = () => { this.closeModal('detailModal'); this.openEditModal(album.id); };
+                document.getElementById('btnDeleteAlbum').onclick = () => { this.closeModal('detailModal'); this.deleteAlbum(album.id); };
+
+                this.openModal('detailModal');
+            }
+
+            toggleFlipModalCard() {
+                document.getElementById('modalCardInner').classList.toggle('rotate-y-180');
+            }
+
+            openAddModal() {
+                document.getElementById('addModalTitle').textContent = "Añadir Disco";
+                document.getElementById('albumForm').reset();
+                document.getElementById('formAlbumId').value = "";
+                this.openModal('addModal');
+            }
+
+            openEditModal(id) {
+                const album = this.collection.find(a => a.id === id);
+                if (!album) return;
+
+                document.getElementById('addModalTitle').textContent = "Editar Disco";
+                document.getElementById('formAlbumId').value = album.id;
+                document.getElementById('formTitle').value = album.title;
+                document.getElementById('formArtist').value = album.artist;
+                document.getElementById('formYear').value = album.year || '';
+                document.getElementById('formGenre').value = album.genre || '';
+                document.getElementById('formFormat').value = album.format || 'CD';
+                document.getElementById('formBarcode').value = album.barcode || '';
+                document.getElementById('formFrontCover').value = album.frontCover || '';
+                document.getElementById('formBackCover').value = album.backCover || '';
+
+                document.getElementById('formTracklist').value = (album.tracks || []).map(t => `${t.title} ${t.duration ? '(' + t.duration + ')' : ''}`).join('\n');
+                this.openModal('addModal');
+            }
+
+            handleSaveAlbum(e) {
+                e.preventDefault();
+                const id = document.getElementById('formAlbumId').value;
+                const title = document.getElementById('formTitle').value.trim();
+                const artist = document.getElementById('formArtist').value.trim();
+                const year = parseInt(document.getElementById('formYear').value) || null;
+                const genre = document.getElementById('formGenre').value.trim() || 'Varios';
+                const format = document.getElementById('formFormat').value;
+                const barcode = document.getElementById('formBarcode').value.trim();
+                const frontCover = document.getElementById('formFrontCover').value.trim();
+                const backCover = document.getElementById('formBackCover').value.trim();
+
+                const rawTracks = document.getElementById('formTracklist').value.split('\n').filter(l => l.trim() !== '');
+                const tracks = rawTracks.map(line => {
+                    let cleanLine = line.replace(/^\d+[\.\)]\s*/, '').trim();
+                    const durationMatch = cleanLine.match(/\(([^)]+)\)$/);
+                    let duration = durationMatch ? durationMatch[1] : '';
+                    if (durationMatch) cleanLine = cleanLine.replace(/\(([^)]+)\)$/, '').trim();
+                    return { title: cleanLine, duration };
+                });
+
+                if (id) {
+                    const idx = this.collection.findIndex(a => a.id === id);
+                    if (idx !== -1) this.collection[idx] = { ...this.collection[idx], title, artist, year, genre, format, barcode, frontCover, backCover, tracks };
+                } else {
+                    this.collection.unshift({
+                        id: 'album-' + Date.now(),
+                        title, artist, year, genre, format, barcode, frontCover, backCover, tracks,
+                        dateAdded: new Date().toISOString()
+                    });
+                }
+
+                this.saveToStorage();
+                this.renderSidebarFilters();
+                this.renderCollection();
+                this.closeModal('addModal');
+                this.showToast('Disco guardado exitosamente');
+            }
+
+            deleteAlbum(id) {
+                if (confirm('¿Eliminar este disco de tu colección?')) {
+                    this.collection = this.collection.filter(a => a.id !== id);
+                    this.saveToStorage();
+                    this.renderSidebarFilters();
+                    this.renderCollection();
+                    this.showToast('Disco eliminado');
+                }
+            }
+
+            openWebImportModal() {
+                document.getElementById('webSearchQuery').value = '';
+                document.getElementById('webSearchResults').innerHTML = '<div class="text-center text-slate-500 py-6 text-xs">Escribe algo arriba para buscar.</div>';
+                this.openModal('webImportModal');
+            }
+
+            async searchWebAlbums() {
+                const query = document.getElementById('webSearchQuery').value.trim();
+                if (!query) return;
+
+                const loader = document.getElementById('webSearchLoading');
+                const resultsContainer = document.getElementById('webSearchResults');
+                loader.classList.remove('hidden');
+                resultsContainer.innerHTML = '';
+
+                try {
+                    const res = await fetch(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(query)}&fmt=json&limit=5`);
+                    const data = await res.json();
+                    loader.classList.add('hidden');
+
+                    if (!data.releases || data.releases.length === 0) {
+                        resultsContainer.innerHTML = '<div class="text-center text-slate-400 py-4 text-xs">No se encontraron álbumes.</div>';
+                        return;
+                    }
+
+                    resultsContainer.innerHTML = data.releases.map(rel => {
+                        const artist = rel['artist-credit'] ? rel['artist-credit'].map(a => a.name).join(' ') : 'Desconocido';
+                        const year = rel.date ? rel.date.substring(0, 4) : 'N/A';
+                        return `
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700/70 flex items-center justify-between gap-2">
+                                <div class="min-w-0">
+                                    <h4 class="font-bold text-xs text-white truncate">${rel.title}</h4>
+                                    <p class="text-[10px] text-slate-400 truncate">${artist} • ${year}</p>
+                                </div>
+                                <button onclick="app.importReleaseDetails('${rel.id}', '${rel.title.replace(/'/g, "\\'")}', '${artist.replace(/'/g, "\\'")}', '${year}', '${rel.barcode || ''}')" class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-medium shrink-0">
+                                    Importar
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+                } catch (e) {
+                    loader.classList.add('hidden');
+                    resultsContainer.innerHTML = '<div class="text-center text-rose-400 py-4 text-xs">Error de conexión web.</div>';
+                }
+            }
+
+            async importReleaseDetails(mbid, title, artist, year, barcode) {
+                this.showToast('Importando datos de la web...');
+                let tracks = [];
+                let frontCover = `https://coverartarchive.org/release/${mbid}/front-500`;
+                let backCover = `https://coverartarchive.org/release/${mbid}/back-500`;
+
+                try {
+                    const relRes = await fetch(`https://musicbrainz.org/ws/2/release/${mbid}?inc=recordings&fmt=json`);
+                    const relData = await relRes.json();
+                    if (relData.media) {
+                        relData.media.forEach(m => (m.tracks || []).forEach(t => {
+                            let durStr = '';
+                            if (t.length) {
+                                const sec = Math.floor((t.length / 1000) % 60);
+                                const min = Math.floor((t.length / (1000 * 60)) % 60);
+                                durStr = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+                            }
+                            tracks.push({ title: t.title, duration: durStr });
+                        }));
+                    }
+                } catch (e) {}
+
+                this.collection.unshift({
+                    id: 'album-' + Date.now(),
+                    title, artist, year: parseInt(year) || null, genre: 'Rock / Pop', format: 'CD',
+                    barcode: barcode || mbid, frontCover, backCover,
+                    tracks: tracks.length > 0 ? tracks : [{ title: "Pista 1", duration: "" }],
+                    dateAdded: new Date().toISOString()
+                });
+
+                this.saveToStorage();
+                this.renderSidebarFilters();
+                this.renderCollection();
+                this.closeModal('webImportModal');
+                this.showToast(`"${title}" importado exitosamente`);
+            }
+
+            openScannerModal() {
+                this.openModal('scannerModal');
+                try {
+                    this.html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 220, height: 140 } }, false);
+                    this.html5QrcodeScanner.render(code => this.handleScannedCode(code));
+                } catch (e) {}
+            }
+
+            closeScannerModal() {
+                if (this.html5QrcodeScanner) {
+                    this.html5QrcodeScanner.clear().catch(e => {});
+                }
+                this.closeModal('scannerModal');
+            }
+
+            simulateScan(code) { this.handleScannedCode(code); }
+
+            handleScannedCode(code) {
+                this.closeScannerModal();
+                const existing = this.collection.find(a => a.barcode === code);
+                if (existing) {
+                    this.showToast('¡Disco en tu colección!');
+                    this.openDetailModal(existing.id);
+                } else {
+                    this.openWebImportModal();
+                    document.getElementById('webSearchQuery').value = code;
+                    this.searchWebAlbums();
+                }
+            }
+
+            exportCollection() {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.collection, null, 2));
+                const a = document.createElement('a');
+                a.setAttribute("href", dataStr);
+                a.setAttribute("download", `audiovault_coleccion_${new Date().toISOString().slice(0,10)}.json`);
+                a.click();
+            }
+
+            importCollection(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const imported = JSON.parse(evt.target.result);
+                        if (Array.isArray(imported)) {
+                            this.collection = imported;
+                            this.saveToStorage();
+                            this.renderSidebarFilters();
+                            this.renderCollection();
+                            this.showToast('Colección importada');
+                        }
+                    } catch (err) { alert('Error en el archivo.'); }
+                };
+                reader.readAsText(file);
+            }
+
+            openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+            closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+            showToast(msg) {
+                const toast = document.getElementById('toast');
+                document.getElementById('toastMessage').textContent = msg;
+                toast.classList.remove('translate-y-16', 'opacity-0', 'pointer-events-none');
+                setTimeout(() => toast.classList.add('translate-y-16', 'opacity-0', 'pointer-events-none'), 3000);
+            }
+        }
+
+        let app;
+        window.addEventListener('DOMContentLoaded', () => { app = new MusicApp(); });
+    </script>
+</body>
+</html>
